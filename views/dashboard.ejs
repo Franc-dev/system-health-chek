@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Health Monitor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Add Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="transition-colors duration-300">
+  <!-- Theme script at the top to prevent flash -->
+  <script>
+    // Check for saved theme preference
+    const theme = localStorage.getItem('theme') || 'dark';
+    document.body.className = theme === 'dark' ? 'bg-gray-900 text-gray-100' : 'bg-gray-50 text-gray-900';
+  </script>
+
+  <div class="max-w-6xl mx-auto p-4">
+    <!-- Header with Theme Toggle -->
+    <div class="flex justify-between items-center mb-4">
+      <div class="flex gap-4 items-center">
+        <h1 class="font-mono text-lg">SYSTEM: <%= systemId %></h1>
+        <span id="countdown" class="font-mono text-gray-400"></span>
+      </div>
+      <div class="flex items-center gap-4">
+        <!-- Theme Toggle Button -->
+        <button id="themeToggle" class="p-2 rounded-lg bg-opacity-10 hover:bg-opacity-20 transition-colors">
+          <i id="themeIcon" data-lucide="sun" class="w-5 h-5"></i>
+        </button>
+        <!-- System Status Indicators -->
+        <div class="flex gap-3">
+          <div class="flex items-center gap-2 p-2 rounded-lg bg-opacity-10">
+            <i data-lucide="cpu" class="w-4 h-4"></i>
+            <div class="w-2 h-2 rounded-full <%= logs[0].cpuLoad > 80 ? 'bg-red-500' : 'bg-green-500' %>"></div>
+            <span class="font-mono"><%= logs[0].cpuLoad.toFixed(1) %>%</span>
+          </div>
+          <div class="flex items-center gap-2 p-2 rounded-lg bg-opacity-10">
+            <i data-lucide="memory" class="w-4 h-4"></i>
+            <div class="w-2 h-2 rounded-full <%= logs[0].memoryUsage > 1000 ? 'bg-red-500' : 'bg-green-500' %>"></div>
+            <span class="font-mono"><%= logs[0].memoryUsage.toFixed(0) %>MB</span>
+          </div>
+          <div class="flex items-center gap-2 p-2 rounded-lg bg-opacity-10">
+            <i data-lucide="wifi" class="w-4 h-4"></i>
+            <div class="w-2 h-2 rounded-full <%= logs[0].apiStatus === 'UP' ? 'bg-green-500' : 'bg-red-500' %>"></div>
+            <span class="font-mono">API <%= logs[0].apiStatus %></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert for High Usage -->
+    <% if (logs[0].cpuLoad > 80 || logs[0].memoryUsage > 1000) { %>
+    <div class="bg-red-500 bg-opacity-10 border border-red-500 text-red-500 p-3 rounded-lg mb-4">
+      <div class="flex items-center gap-2">
+        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+        <strong>High Resource Usage Detected</strong>
+      </div>
+      <p class="mt-1 text-sm">
+        <%= logs[0].cpuLoad > 80 ? 'CPU usage is above 80%. ' : '' %>
+        <%= logs[0].memoryUsage > 1000 ? 'Memory usage is above 1GB. ' : '' %>
+        Consider investigating system performance.
+      </p>
+    </div>
+    <% } %>
+
+    <!-- Charts Container -->
+    <div class="grid gap-4 mb-4">
+      <!-- Main Metrics Chart -->
+      <div class="bg-gray-800 dark:bg-gray-800 bg-opacity-50 rounded-lg p-4 transition-colors">
+        <canvas id="metricsChart" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- Updated Table with proper theme classes -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg overflow-x-auto transition-colors">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-gray-500 dark:text-gray-400 text-xs">
+            <th class="p-3 text-left border-b border-gray-200 dark:border-gray-700">TIME</th>
+            <th class="p-3 text-left border-b border-gray-200 dark:border-gray-700">CPU</th>
+            <th class="p-3 text-left border-b border-gray-200 dark:border-gray-700">MEM</th>
+            <th class="p-3 text-left border-b border-gray-200 dark:border-gray-700">API</th>
+            <th class="p-3 text-left border-b border-gray-200 dark:border-gray-700">TREND</th>
+          </tr>
+        </thead>
+        <tbody class="font-mono">
+          <% logs.forEach((log, index) => { %>
+            <tr class="border-b border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">
+              <td class="p-3"><%= new Date(log.timestamp).toLocaleTimeString() %></td>
+              <td class="p-3">
+                <%= log.cpuLoad.toFixed(1) %>%
+                <% if (index > 0) { %>
+                  <% const trend = log.cpuLoad - logs[index-1].cpuLoad; %>
+                  <span class="text-xs <%= trend > 0 ? 'text-red-500 dark:text-red-400' : 'text-green-500 dark:text-green-400' %>">
+                    <%= trend > 0 ? '↑' : '↓' %><%= Math.abs(trend).toFixed(1) %>
+                  </span>
+                <% } %>
+              </td>
+              <td class="p-3"><%= log.memoryUsage.toFixed(0) %>MB</td>
+              <td class="p-3">
+                <span class="px-1.5 py-0.5 text-xs rounded
+                  <%= log.apiStatus === 'UP' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' %>">
+                  <%= log.apiStatus %>
+                </span>
+              </td>
+              <td class="p-3 text-xs">
+                <% if (index > 0) { %>
+                  <% 
+                    let cpuTrend = 0;
+                    const prevCpu = logs[index-1].cpuLoad;
+                    const currentCpu = log.cpuLoad;
+                    
+                    if (prevCpu === 0 && currentCpu === 0) {
+                      cpuTrend = 0;
+                    } else if (prevCpu === 0) {
+                      cpuTrend = currentCpu > 0 ? 100 : 0;
+                    } else {
+                      cpuTrend = ((currentCpu - prevCpu) / prevCpu * 100).toFixed(1);
+                    }
+                  %>
+                  <span class="<%= cpuTrend > 0 ? 'text-red-500 dark:text-red-400' : 'text-green-500 dark:text-green-400' %>">
+                    <%= cpuTrend === 0 ? '0.0' : cpuTrend %>%
+                  </span>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    // Theme Toggle Logic
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = document.getElementById('themeIcon');
+    let isDark = localStorage.getItem('theme') !== 'light';
+
+    function updateTheme() {
+      const body = document.body;
+      const chart = Chart.getChart('metricsChart');
+      
+      if (isDark) {
+        body.classList.remove('bg-gray-50', 'text-gray-900');
+        body.classList.add('bg-gray-900', 'text-gray-100');
+        themeIcon.setAttribute('data-lucide', 'sun');
+        if (chart) updateChartTheme(chart, true);
+      } else {
+        body.classList.remove('bg-gray-900', 'text-gray-100');
+        body.classList.add('bg-gray-50', 'text-gray-900');
+        themeIcon.setAttribute('data-lucide', 'moon');
+        if (chart) updateChartTheme(chart, false);
+      }
+      lucide.createIcons();
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    }
+
+    themeToggle.addEventListener('click', () => {
+      isDark = !isDark;
+      updateTheme();
+    });
+
+    function updateChartTheme(chart, isDark) {
+      chart.options.scales.y.grid.color = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+      chart.options.scales.x.grid.color = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+      chart.options.scales.y.ticks.color = isDark ? '#f3f4f6' : '#111827';
+      chart.options.scales.x.ticks.color = isDark ? '#f3f4f6' : '#111827';
+      chart.update();
+    }
+
+    // Enhanced countdown timer
+    function updateCountdown() {
+      const now = new Date();
+      const nextUpdate = new Date(now.setMinutes(now.getMinutes() + 5));
+      
+      const timer = setInterval(() => {
+        const current = new Date();
+        const diff = Math.floor((nextUpdate - current) / 1000);
+        const minutes = Math.floor(diff / 60);
+        const seconds = diff % 60;
+        
+        const countdownEl = document.getElementById('countdown');
+        countdownEl.textContent = 
+          `NEXT UPDATE IN ${minutes}:${seconds.toString().padStart(2, '0')}`;
+        
+        if (diff <= 0) {
+          clearInterval(timer);
+          location.reload();
+        }
+      }, 1000);
+    }
+
+    // Enhanced Chart
+    const ctx = document.getElementById('metricsChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: JSON.parse('<%- JSON.stringify(logs.map(log => new Date(log.timestamp).toLocaleTimeString())) %>'),
+        datasets: [
+          {
+            label: 'CPU Load %',
+            data: JSON.parse('<%- JSON.stringify(logs.map(log => log.cpuLoad)) %>'),
+            borderColor: 'rgb(34, 197, 94)',
+            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0
+          },
+          {
+            label: 'Memory (MB)',
+            data: JSON.parse('<%- JSON.stringify(logs.map(log => log.memoryUsage)) %>'),
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { intersect: false, mode: 'index' },
+        plugins: {
+          legend: { 
+            position: 'top',
+            labels: { 
+              color: isDark ? '#f3f4f6' : '#111827',
+              font: { family: 'monospace' }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: { color: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' },
+            ticks: { 
+              color: isDark ? '#f3f4f6' : '#111827',
+              font: { family: 'monospace' }
+            }
+          },
+          x: {
+            grid: { color: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' },
+            ticks: { 
+              color: isDark ? '#f3f4f6' : '#111827',
+              font: { family: 'monospace' }
+            }
+          }
+        }
+      }
+    });
+
+    updateCountdown();
+  </script>
+</body>
+</html>
